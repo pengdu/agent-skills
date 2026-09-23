@@ -10,7 +10,8 @@
 #   ./install.sh --no-backup    跳过安装前的备份
 #
 # 行为:
-#   - skills/      → rsync 合并到 <target>/skills/(保留目标已有、仓库没有的技能)
+#   - skills/      → 合并到 <target>/skills/(保留目标已有、仓库没有的技能)
+#                    优先 rsync,缺失时回退 tar 管道,再回退 cp -a
 #   - .skill-lock.json → 备份后覆盖(除非 --no-lock)
 #   - 若目标无 .skill-lock.json,直接写入
 set -euo pipefail
@@ -49,7 +50,7 @@ log "仓库技能数: $(find "${SRC_SKILLS}" -maxdepth 1 -mindepth 1 -type d | w
 
 if [[ "${DRY_RUN}" -eq 1 ]]; then
   log "DRY-RUN 模式,仅预览:"
-  log "  rsync -a --delete ${SRC_SKILLS}/ → ${TARGET}/skills/"
+  log "  同步 ${SRC_SKILLS}/ → ${TARGET}/skills/ (rsync / tar / cp 三选一)"
   [[ "${NO_LOCK}" -eq 1 ]] || log "  cp ${SRC_LOCK} → ${TARGET}/.skill-lock.json (备份后)"
   exit 0
 fi
@@ -65,7 +66,16 @@ fi
 
 # 2) 合并 skills 目录
 mkdir -p "${TARGET}/skills"
-rsync -a --delete "${SRC_SKILLS}/" "${TARGET}/skills/"
+if command -v rsync >/dev/null 2>&1; then
+  rsync -a "${SRC_SKILLS}/" "${TARGET}/skills/"
+  log "使用 rsync 同步"
+elif command -v tar >/dev/null 2>&1; then
+  (cd "${SRC_SKILLS}" && tar cf - .) | (cd "${TARGET}/skills" && tar xf -)
+  log "使用 tar 管道同步(无 rsync)"
+else
+  cp -a "${SRC_SKILLS}/." "${TARGET}/skills/"
+  log "使用 cp -a 同步(无 rsync/tar)"
+fi
 log "skills/ 已合并 → ${TARGET}/skills/ ($(find "${TARGET}/skills" -maxdepth 1 -mindepth 1 -type d | wc -l | tr -d ' ') 个目录)"
 
 # 3) 覆盖 lock
