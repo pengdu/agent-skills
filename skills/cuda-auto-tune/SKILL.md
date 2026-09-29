@@ -13,6 +13,16 @@ STOP — Do you have NCU profile data for this kernel?
   YES → Go to Step 2.
 ```
 
+**If NCU cannot collect counters at all, this skill does not apply.** Confirm it is
+genuinely blocked rather than merely unconfigured: run `ncu --version`, then attempt a
+real collection on a trivial kernel. Blocked means one of: `ERR_NVGPUCTRPERM` with
+`RmProfilingAdminOnly: 1` and no `CAP_SYS_ADMIN` available; an ncu whose injection
+library refuses the installed driver with no matching ncu version obtainable; or an
+SM 7.5+ device where only `nvprof` exists. In those cases switch to the
+`cuda-tune-without-ncu` skill, which substitutes achievable-bandwidth microbenchmarks,
+read/write ablation, SASS/ptxas inspection and the occupancy API for the counters, at
+explicitly lower confidence. Do not fall back to optimizing from experience alone.
+
 **Hard rules — violation of any rule invalidates the entire optimization:**
 - NEVER change kernel code, launch config, or template parameters without NCU data.
 - ALL recommendations MUST cite specific NCU metric values as evidence.
